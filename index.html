@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Y2K 拍立得相機</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "PingFang SC", "Microsoft JhengHei", sans-serif;
+    }
+
+    body {
+      background: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #e0f7ff, #fce4ec, #f3e5f5);
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-bottom: 12px;
+      color: #e91e63;
+      text-shadow: 0 0 8px #ff80ab;
+    }
+
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .preview-wrap {
+      position: relative;
+      width: 320px;
+      height: 400px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fafafa;
+      box-shadow: 0 0 30px rgba(100, 150, 255, 0.3);
+      border: 8px solid #fff;
+    }
+
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      background-size: cover;
+      background-position: center;
+      display: none;
+    }
+
+    .frame.show {
+      display: block;
+    }
+
+    /* 新增：泡泡和爱心特效容器 */
+    .effects {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 6;
+      overflow: hidden;
+    }
+
+    .bubble, .heart {
+      position: absolute;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.7;
+      animation: float 8s infinite ease-in-out;
+    }
+
+    .bubble {
+      background-image: url('https://i.imgur.com/9XH9Q0x.png');
+    }
+
+    .heart {
+      background-image: url('https://i.imgur.com/5Z7sY4F.png');
+    }
+
+    @keyframes float {
+      0% {
+        transform: translate(0, 100%) rotate(0deg);
+        opacity: 0;
+      }
+      20% {
+        opacity: 0.8;
+      }
+      80% {
+        opacity: 0.8;
+      }
+      100% {
+        transform: translate(0, -20%) rotate(360deg);
+        opacity: 0;
+      }
+    }
+
+    /* 调整后：清新蓝粉Y2K滤镜 */
+    .y2k-filter {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, rgba(183, 222, 237, 0.2), rgba(255, 183, 205, 0.2));
+      mix-blend-mode: soft-light;
+      opacity: 0.7;
+      z-index: 5;
+      pointer-events: none;
+      backdrop-filter: blur(0.8px);
+    }
+
+    .countdown {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px;
+      font-weight: bold;
+      color: #e91e63;
+      text-shadow: 0 0 20px #ff80ab;
+      z-index: 999;
+      display: none;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      padding: 12px 20px;
+      border-radius: 50px;
+      border: none;
+      font-size: 15px;
+      font-weight: bold;
+      background: #ff80ab;
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(255, 128, 171, 0.4);
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background: #ff4081;
+      transform: scale(1.05);
+    }
+
+    #flipBtn {
+      background: #64b5f6;
+    }
+
+    #uploadBtn {
+      background: #9c27b0;
+    }
+
+    #saveBtn {
+      background: #4caf50;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Y2K 拍立得相機</h1>
+
+  <div class="container">
+    <div class="preview-wrap">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas" class="hidden"></canvas>
+      <div class="y2k-filter"></div>
+      <div class="effects" id="effects"></div>
+      <div class="countdown" id="countdown"></div>
+      <div class="frame" id="frame"></div>
+    </div>
+
+    <div class="btn-group">
+      <button id="shootBtn">📸 倒數拍照</button>
+      <button id="flipBtn">🔄 翻轉鏡頭</button>
+      <button id="uploadBtn">🖼️ 上傳相片</button>
+      <button id="saveBtn">💾 儲存照片</button>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*"/>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const countdown = document.getElementById('countdown');
+    const frame = document.getElementById('frame');
+    const fileInput = document.getElementById('fileInput');
+    const effects = document.getElementById('effects');
+
+    let facingMode = 'environment';
+    let stream = null;
+    let currentImage = null;
+
+    // 10 款拍立得相框（透明 PNG 線條風格，匹配清新Y2K）
+    const frames = [
+      'https://i.imgur.com/7WZ3Q9t.png',
+      'https://i.imgur.com/5tBjR2s.png',
+      'https://i.imgur.com/9m6Z8kP.png',
+      'https://i.imgur.com/8aF7sXj.png',
+      'https://i.imgur.com/6sD9n2b.png',
+      'https://i.imgur.com/4gH8kLp.png',
+      'https://i.imgur.com/3jK7m5t.png',
+      'https://i.imgur.com/2sB6n8d.png',
+      'https://i.imgur.com/1m95p7s.png',
+      'https://i.imgur.com/0j84n6b.png'
+    ];
+
+    // 生成泡泡和爱心特效
+    function createEffects() {
+      effects.innerHTML = '';
+      const count = 15; // 特效数量
+      for (let i = 0; i < count; i++) {
+        const isBubble = Math.random() > 0.3;
+        const elem = document.createElement('div');
+        elem.className = isBubble ? 'bubble' : 'heart';
+        const size = Math.random() * 30 + 10;
+        elem.style.width = `${size}px`;
+        elem.style.height = `${size}px`;
+        elem.style.left = `${Math.random() * 100}%`;
+        elem.style.animationDelay = `${Math.random() * 8}s`;
+        effects.appendChild(elem);
+      }
+    }
+
+    // 啟動鏡頭
+    async function startCamera() {
+      stopStream();
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode, width: 1280, height: 1600 }
+        });
+        video.srcObject = stream;
+        video.classList.remove('hidden');
+        canvas.classList.add('hidden');
+        frame.classList.remove('show');
+        createEffects(); // 启动相机时生成特效
+      } catch (e) {
+        alert('無法開啟相機，請允許權限');
+        console.error(e);
+      }
+    }
+
+    function stopStream() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+    }
+
+    // 倒數拍照
+    document.getElementById('shootBtn').onclick = () => {
+      let num = 3;
+      countdown.style.display = 'block';
+      countdown.textContent = num;
+
+      const timer = setInterval(() => {
+        num--;
+        if (num > 0) {
+          countdown.textContent = num;
+        } else {
+          clearInterval(timer);
+          countdown.style.display = 'none';
+          takeShot();
+        }
+      }, 1000);
+    };
+
+    // 拍攝
+    function takeShot() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      applyY2K();
+      showRandomFrame();
+      video.classList.add('hidden');
+      canvas.classList.remove('hidden');
+      currentImage = canvas.toDataURL('image/png');
+    }
+
+    // 调整后：匹配图片的Y2K清新蓝粉调滤镜
+    function applyY2K() {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // 强化蓝色调，提亮粉色，增加柔光感
+        data[i] = Math.min(255, data[i] + 15);     // 红通道（粉色提亮）
+        data[i+1] = Math.min(255, data[i+1] + 10); // 绿通道
+        data[i+2] = Math.min(255, data[i+2] + 35); // 蓝通道（强化清新蓝）
+        data[i+3] = 245; // 更浅的朦胧感
+      }
+      ctx.putImageData(imageData, 0, 0);
+      // 叠加柔光滤镜
+      ctx.fillStyle = 'rgba(255, 240, 245, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // 隨機相框
+    function showRandomFrame() {
+      const url = frames[Math.floor(Math.random() * frames.length)];
+      frame.style.backgroundImage = `url(${url})`;
+      frame.classList.add('show');
+    }
+
+    // 翻轉鏡頭
+    document.getElementById('flipBtn').onclick = () => {
+      facingMode = facingMode === 'environment' ? 'user' : 'environment';
+      startCamera();
+    };
+
+    // 上傳相片
+    document.getElementById('uploadBtn').onclick = () => {
+      fileInput.click();
+    };
+
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        applyY2K();
+        showRandomFrame();
+        createEffects(); // 上传图片时生成特效
+        video.classList.add('hidden');
+        canvas.classList.remove('hidden');
+        currentImage = canvas.toDataURL('image/png');
+      };
+      img.src = URL.createObjectURL(file);
+    };
+
+    // 儲存
+    document.getElementById('saveBtn').onclick = () => {
+      if (!currentImage) return alert('請先拍照或上傳相片');
+      const a = document.createElement('a');
+      a.download = 'Y2K拍立得_' + Date.now() + '.png';
+      a.href = currentImage;
+      a.click();
+    };
+
+    startCamera();
+  </script>
+</body>
+</html>
