@@ -56,14 +56,12 @@ background:transparent;
 box-shadow:0 4px 16px rgba(0,0,60,.35);
 margin-bottom:0;
 }
-/* idol mode: preview is only the LEFT half (user side) */
-.preview-box.idol-mode{
-/* width = half of full frame width; set by JS */
-}
 .preview-video{
-position:absolute;inset:0;
+/* 不用 absolute，讓 video 直接填滿容器 */
+display:block;
 width:100%;height:100%;
 object-fit:cover;
+border-radius:4px;
 }
 /* In idol mode, frame image is shifted so only right half (idol) shows */
 .preview-frame{
@@ -219,11 +217,11 @@ transition:opacity .4s .45s,transform .4s .45s;
       <video id="lensVid" class="preview-video" autoplay playsinline muted></video>
       <img class="preview-frame" id="previewFrame" src="" alt="" style="display:none">
     </div>
-    <!-- TAP indicator between preview and camera -->
-    <div class="tap-ind" id="tapInd">👇</div>
     <div class="cam-wrap" id="camWrap" onclick="shoot()">
       <img id="camImg" class="cam-img" src="" alt="TWICE instax">
     </div>
+    <!-- TAP indicator below camera -->
+    <div class="tap-ind" id="tapInd">👇</div>
   </div>
 
   <!-- Frame strip -->
