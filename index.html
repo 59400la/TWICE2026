@@ -531,14 +531,37 @@ function upload(e){
   const file=e.target.files[0]; if(!file) return;
   const rd=new FileReader();
   rd.onload=ev=>{
-    const img=new Image();
-    img.onload=()=>{
-      const c=document.getElementById("cv");
-      c.width=img.width; c.height=img.height;
-      const ctx=c.getContext("2d"); ctx.drawImage(img,0,0);
-      applyFX(ctx,img.width,img.height);
-      showPhoto(c.toDataURL("image/jpeg",.92));
-    }; img.src=ev.target.result;
+    const raw=new Image();
+    raw.onload=async ()=>{
+      if(selType==="idol"){
+        const fm2 = await new Promise(resolve=>{
+          const img=new Image();
+          if(idolImgCache[sel]&&idolImgCache[sel].complete&&idolImgCache[sel].naturalWidth>0){resolve(idolImgCache[sel]);return;}
+          img.onload=()=>{idolImgCache[sel]=img;resolve(img);}; img.onerror=()=>resolve(null);
+          img.src=IDOL_FRAMES[sel];
+        });
+        if(!fm2||!fm2.naturalWidth){showPhoto(ev.target.result,false);return;}
+        const SCALE=4, FW=fm2.naturalWidth*SCALE, FH=fm2.naturalHeight*SCALE;
+        const c=document.getElementById("cv"); c.width=FW; c.height=FH;
+        const ctx=c.getContext("2d");
+        // Draw uploaded image cover-fit across full canvas
+        const scaleX=FW/raw.width, scaleY=FH/raw.height, scale=Math.max(scaleX,scaleY);
+        const sw=FW/scale, sh=FH/scale;
+        const sx=(raw.width-sw)/2, sy=(raw.height-sh)/2;
+        ctx.drawImage(raw,sx,sy,sw,sh,0,0,FW,FH);
+        // Overlay idol PNG
+        ctx.drawImage(fm2,0,0,FW,FH);
+        // Apply filter to full composite
+        applyFX(ctx,FW,FH);
+        showPhoto(c.toDataURL("image/png"),true);
+      } else {
+        const c=document.getElementById("cv");
+        c.width=raw.width; c.height=raw.height;
+        const ctx=c.getContext("2d"); ctx.drawImage(raw,0,0);
+        applyFX(ctx,raw.width,raw.height);
+        showPhoto(c.toDataURL("image/jpeg",.92),false);
+      }
+    }; raw.src=ev.target.result;
   }; rd.readAsDataURL(file);
 }
 
