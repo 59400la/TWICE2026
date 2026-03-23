@@ -442,8 +442,8 @@ async function snap(){
 
   if(selType==="idol"){
     // Composite: build full image now so preview & download are identical
-    const fm2=new Image(); fm2.src=IDOL_FRAMES[sel];
-    await new Promise(r=>{fm2.onload=r;fm2.onerror=r;});
+    const fm2=new Image();
+    await new Promise(r=>{fm2.onload=r;fm2.onerror=r; fm2.src=IDOL_FRAMES[sel];});
     const FH=fm2.naturalHeight||900, FW=fm2.naturalWidth||600;
     const halfW=Math.round(FW/2);
     const c=document.getElementById("cv");
@@ -476,7 +476,11 @@ async function snap(){
       ctx.fillStyle=gr;ctx.fillRect(0,0,halfW,FH);ctx.restore();
     }
 
-    // RIGHT: idol frame (draws transparent left + idol right)
+    // Fill right half white so PNG transparency shows correctly when saved as JPEG
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(halfW,0,halfW,FH);
+
+    // RIGHT: idol frame (transparent left = shows user, right = idol)
     ctx.drawImage(fm2,0,0,FW,FH);
     showPhoto(c.toDataURL("image/jpeg",.92), true);
   } else {
@@ -545,13 +549,22 @@ async function dlPhoto(){
   const off=document.createElement("canvas");
 
   if(alreadyComposited){
-    // Already composited in snap(), just save the url directly
-    const img2=new Image(); img2.src=url; await new Promise(r=>img2.onload=r);
-    off.width=img2.width; off.height=img2.height;
-    const ctx2=off.getContext("2d"); ctx2.drawImage(img2,0,0);
+    // Already composited correctly in snap() — download directly without re-encoding
+    const fname="twice-"+Date.now()+".jpg";
+    const byteStr=atob(url.split(",")[1]);
+    const ab=new ArrayBuffer(byteStr.length);
+    const ia=new Uint8Array(ab);
+    for(let i=0;i<byteStr.length;i++) ia[i]=byteStr.charCodeAt(i);
+    const blob=new Blob([ab],{type:"image/jpeg"});
+    const file=new File([blob],fname,{type:"image/jpeg"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{await navigator.share({files:[file],title:"TWICE CAM"});return;}catch(e){}
+    }
+    const a=document.createElement("a");a.download=fname;a.href=URL.createObjectURL(blob);a.click();
+    return;
   } else if(st==="idol"){
-    const fm2=new Image(); fm2.crossOrigin="anonymous"; fm2.src=IDOL_FRAMES[si];
-    await new Promise(r=>{fm2.onload=r;fm2.onerror=r;});
+    const fm2=new Image();
+    await new Promise(r=>{fm2.onload=r;fm2.onerror=r; fm2.src=IDOL_FRAMES[si];});
 
     // Canvas size = idol frame natural size
     const FH = fm2.naturalHeight || 900;
@@ -645,10 +658,11 @@ async function processIdolFrames(){
   }
 }
 
-initStrip();
-startCam(fm);
 // Sync tap logo src from header logo
 document.querySelector(".tap-logo").src = document.querySelector(".twice-logo").src;
+
+initStrip();
+startCam(fm);
 </script>
 
 </body>
