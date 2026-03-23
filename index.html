@@ -221,7 +221,7 @@ transition:opacity .4s .45s,transform .4s .45s;
 <div class="mid" id="mid">
   <div class="cam-col" id="camCol">
     <div class="preview-box" id="previewBox">
-      <video id="lensVid" class="preview-video" autoplay playsinline muted></video>
+      <video id="lensVid" class="preview-video" autoplay playsinline webkit-playsinline muted disablepictureinpicture></video>
       <img class="preview-frame" id="previewFrame" src="" alt="" style="display:none">
     </div>
     <div class="cam-wrap" id="camWrap" onclick="shoot()">
@@ -313,7 +313,7 @@ document.getElementById("logoImg").src=LOGO_IMG;
 const PNG_W=320, PNG_H=480;
 
 let str=null, fm="user", fx="normal";
-let selType="idol", sel=0, selFull=-1; // selType: "idol"|"full"
+let selType="full", sel=0, selFull=0; // selType: "idol"|"full"
 let busy=false, last=null;
 
 // Idol frame aspect ratio: 300x225 (landscape, left=user right=idol)
@@ -379,7 +379,7 @@ function initStrip(){
 
   // Section: Full overlay frames
   const t3 = document.createElement("div");
-  t3.className = "strip-tab"; t3.textContent = "相框"; t3.style.marginTop="6px";
+  t3.className = "strip-tab"; t3.textContent = "FRAME"; t3.style.marginTop="6px";
   s.appendChild(t3);
 
   FULL_FRAMES.forEach((src,i)=>{
@@ -756,6 +756,7 @@ const idolImgCache = [];
 })();
 
 initStrip();
+pick("full", 0);
 startCam(fm);
 </script>
 
