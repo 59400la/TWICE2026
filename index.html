@@ -450,10 +450,6 @@ async function snap(){
     c.width=FW; c.height=FH;
     const ctx=c.getContext("2d");
 
-    // Fill white background to avoid black on JPEG export
-    ctx.fillStyle="#ffffff";
-    ctx.fillRect(0,0,FW,FH);
-
     // LEFT: user, cover-fit, clipped
     ctx.save();
     ctx.beginPath(); ctx.rect(0,0,halfW,FH); ctx.clip();
@@ -476,13 +472,9 @@ async function snap(){
       ctx.fillStyle=gr;ctx.fillRect(0,0,halfW,FH);ctx.restore();
     }
 
-    // Fill right half white so PNG transparency shows correctly when saved as JPEG
-    ctx.fillStyle="#ffffff";
-    ctx.fillRect(halfW,0,halfW,FH);
-
     // RIGHT: idol frame (transparent left = shows user, right = idol)
     ctx.drawImage(fm2,0,0,FW,FH);
-    showPhoto(c.toDataURL("image/jpeg",.92), true);
+    showPhoto(c.toDataURL("image/png"), true);
   } else {
     const c=document.getElementById("cv");
     c.width=raw.width; c.height=raw.height;
@@ -555,12 +547,15 @@ async function dlPhoto(){
     const ab=new ArrayBuffer(byteStr.length);
     const ia=new Uint8Array(ab);
     for(let i=0;i<byteStr.length;i++) ia[i]=byteStr.charCodeAt(i);
-    const blob=new Blob([ab],{type:"image/jpeg"});
-    const file=new File([blob],fname,{type:"image/jpeg"});
+    const mimeType=url.startsWith("data:image/png")?"image/png":"image/jpeg";
+    const blob=new Blob([ab],{type:mimeType});
+    const ext=mimeType==="image/png"?"png":"jpg";
+    const fname2="twice-"+Date.now()+"."+ext;
+    const file=new File([blob],fname2,{type:mimeType});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
       try{await navigator.share({files:[file],title:"TWICE CAM"});return;}catch(e){}
     }
-    const a=document.createElement("a");a.download=fname;a.href=URL.createObjectURL(blob);a.click();
+    const a=document.createElement("a");a.download=file.name;a.href=URL.createObjectURL(blob);a.click();
     return;
   } else if(st==="idol"){
     const fm2=new Image();
@@ -572,10 +567,6 @@ async function dlPhoto(){
     const halfW = Math.round(FW / 2);
     off.width=FW; off.height=FH;
     const ctx=off.getContext("2d");
-
-    // Fill white background to avoid black on JPEG export
-    ctx.fillStyle="#ffffff";
-    ctx.fillRect(0,0,FW,FH);
 
     // LEFT HALF: user photo, cover-fit, clipped
     ctx.save();
