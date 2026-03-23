@@ -350,7 +350,7 @@ function initStrip(){
 
   // Section: Idol frames
   const t2 = document.createElement("div");
-  t2.className = "strip-tab"; t2.textContent = "互動"; t2.style.marginTop="6px";
+  t2.className = "strip-tab"; t2.textContent = "TWICE"; t2.style.marginTop="6px";
   s.appendChild(t2);
 
   IDOL_THUMBS.forEach((src,i)=>{
@@ -432,16 +432,61 @@ async function snap(){
     alert("相機未就緒"); document.getElementById("previewBox").style.opacity="1"; busy=false; return;
   }
 
-  const c = document.getElementById("cv");
-  // For idol mode, capture only user portion (left half of frame)
-  // We'll capture full video and composite with idol frame in showPhoto
-  c.width=v.videoWidth; c.height=v.videoHeight;
-  const ctx=c.getContext("2d");
-  if(fm==="user"){ ctx.translate(c.width,0); ctx.scale(-1,1); }
-  ctx.drawImage(v,0,0);
-  if(fm==="user") ctx.setTransform(1,0,0,1,0,0);
-  applyFX(ctx,c.width,c.height);
-  showPhoto(c.toDataURL("image/jpeg",.92));
+  // Capture raw video frame
+  const raw = document.createElement("canvas");
+  raw.width=v.videoWidth; raw.height=v.videoHeight;
+  const rctx=raw.getContext("2d");
+  if(fm==="user"){ rctx.translate(raw.width,0); rctx.scale(-1,1); }
+  rctx.drawImage(v,0,0);
+  if(fm==="user") rctx.setTransform(1,0,0,1,0,0);
+
+  if(selType==="idol"){
+    // Composite: build full image now so preview & download are identical
+    const fm2=new Image(); fm2.src=IDOL_FRAMES[sel];
+    await new Promise(r=>{fm2.onload=r;fm2.onerror=r;});
+    const FH=fm2.naturalHeight||900, FW=fm2.naturalWidth||600;
+    const halfW=Math.round(FW/2);
+    const c=document.getElementById("cv");
+    c.width=FW; c.height=FH;
+    const ctx=c.getContext("2d");
+
+    // Fill white background to avoid black on JPEG export
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(0,0,FW,FH);
+
+    // LEFT: user, cover-fit, clipped
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,0,halfW,FH); ctx.clip();
+    const scaleX=halfW/raw.width, scaleY=FH/raw.height;
+    const scale=Math.max(scaleX,scaleY);
+    const sw=halfW/scale, sh=FH/scale;
+    const sx=(raw.width-sw)/2, sy=(raw.height-sh)/2;
+    ctx.drawImage(raw,sx,sy,sw,sh,0,0,halfW,FH);
+    ctx.restore();
+
+    // Apply filter only to left half
+    const id=ctx.getImageData(0,0,halfW,FH);
+    applyFXData(id.data,halfW,FH);
+    ctx.putImageData(id,0,0);
+    if(fx==="y2k"){
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,halfW,FH); ctx.clip();
+      ctx.globalAlpha=.18;
+      const gr=ctx.createRadialGradient(halfW*.3,FH*.2,0,halfW*.5,FH*.4,halfW*.7);
+      gr.addColorStop(0,"rgba(255,240,200,1)");gr.addColorStop(.5,"rgba(255,180,220,.5)");gr.addColorStop(1,"rgba(220,200,255,0)");
+      ctx.fillStyle=gr;ctx.fillRect(0,0,halfW,FH);ctx.restore();
+    }
+
+    // RIGHT: idol frame (draws transparent left + idol right)
+    ctx.drawImage(fm2,0,0,FW,FH);
+    showPhoto(c.toDataURL("image/jpeg",.92), true);
+  } else {
+    const c=document.getElementById("cv");
+    c.width=raw.width; c.height=raw.height;
+    const ctx=c.getContext("2d");
+    ctx.drawImage(raw,0,0);
+    applyFX(ctx,c.width,c.height);
+    showPhoto(c.toDataURL("image/jpeg",.92), false);
+  }
 }
 
 function applyFXData(d, w, h){
@@ -465,12 +510,12 @@ function applyFX(ctx,w,h){
 }
 
 /* ── SHOW PHOTO ── */
-function showPhoto(url){
-  last = {url, selType, sel};
+function showPhoto(url, alreadyComposited){
+  last = {url, selType, sel, alreadyComposited};
   document.getElementById("phImg").src = url;
   const fr = document.getElementById("frImg");
-  if(selType==="idol"){ fr.src=IDOL_FRAMES[sel]; fr.style.display="block"; }
-  else fr.style.display="none";
+  // If already composited (idol mode snap), no need to overlay frame again
+  fr.style.display = "none";
 
   const ov = document.getElementById("photoOverlay");
   ov.classList.add("show");
@@ -495,20 +540,29 @@ function upload(e){
 /* ── DOWNLOAD ── */
 async function dlPhoto(){
   if(!last) return;
-  const {url,selType:st,sel:si} = last;
+  const {url,selType:st,sel:si,alreadyComposited} = last;
   const img=new Image(); img.src=url; await new Promise(r=>img.onload=r);
   const off=document.createElement("canvas");
-  
-  if(st==="idol"){
-    const fm2=new Image(); fm2.src=IDOL_FRAMES[si];
+
+  if(alreadyComposited){
+    // Already composited in snap(), just save the url directly
+    const img2=new Image(); img2.src=url; await new Promise(r=>img2.onload=r);
+    off.width=img2.width; off.height=img2.height;
+    const ctx2=off.getContext("2d"); ctx2.drawImage(img2,0,0);
+  } else if(st==="idol"){
+    const fm2=new Image(); fm2.crossOrigin="anonymous"; fm2.src=IDOL_FRAMES[si];
     await new Promise(r=>{fm2.onload=r;fm2.onerror=r;});
 
-    // Canvas: same aspect as idol frame, split 50/50
+    // Canvas size = idol frame natural size
     const FH = fm2.naturalHeight || 900;
     const FW = fm2.naturalWidth  || 600;
     const halfW = Math.round(FW / 2);
     off.width=FW; off.height=FH;
     const ctx=off.getContext("2d");
+
+    // Fill white background to avoid black on JPEG export
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(0,0,FW,FH);
 
     // LEFT HALF: user photo, cover-fit, clipped
     ctx.save();
@@ -518,7 +572,7 @@ async function dlPhoto(){
     const scale  = Math.max(scaleX, scaleY);
     const sw = halfW / scale;
     const sh = FH / scale;
-    const sx = (img.width  - sw) / 2;
+    const sx = (img.width - sw) / 2;
     const sy = (img.height - sh) / 2;
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, halfW, FH);
     ctx.restore();
@@ -528,11 +582,25 @@ async function dlPhoto(){
     applyFXData(id.data, halfW, FH);
     ctx.putImageData(id, 0, 0);
 
-    // RIGHT HALF: draw idol frame at natural ratio (transparent left, idol right)
+    // RIGHT HALF: idol frame (transparent left, idol right) — drawn at FULL canvas size, no distortion
+    // idol occupies right half of frame image, so drawing full image covers both halves correctly
     ctx.drawImage(fm2, 0, 0, FW, FH);
-
-    const a=document.createElement("a"); a.download="twice-"+Date.now()+".jpg"; a.href=off.toDataURL("image/jpeg",.92); a.click();
+  } else {
+    off.width=img.width; off.height=img.height;
+    const ctx=off.getContext("2d");
+    ctx.drawImage(img,0,0);
+    applyFX(ctx, img.width, img.height);
   }
+
+  // Save to phone camera roll via Web Share API, fallback to download link
+  off.toBlob(async blob=>{
+    const file = new File([blob], "twice-"+Date.now()+".jpg", {type:"image/jpeg"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:"TWICE CAM"}); return; }catch(e){}
+    }
+    // fallback: normal download
+    const a=document.createElement("a"); a.download=file.name; a.href=URL.createObjectURL(blob); a.click();
+  }, "image/jpeg", 0.92);
 }
 
 /* ── RETAKE ── */
