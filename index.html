@@ -466,34 +466,19 @@ async function snap(){
     c.width = FW; c.height = FH;
     const ctx = c.getContext("2d");
 
-    // User goes on the OPPOSITE side from idol
-    const idolOnRight = IDOL_SIDES[sel] === "right";
-    const userX = idolOnRight ? 0 : halfW; // user on left if idol on right, vice versa
-
-    // STEP 1: draw user photo cover-fit into user half
-    ctx.save();
-    ctx.beginPath(); ctx.rect(userX, 0, halfW, FH); ctx.clip();
-    const scaleX = halfW / raw.width;
+    // STEP 1: draw user video cover-fit across FULL canvas (same as preview-video fills preview-box)
+    // The idol PNG will overlay and cover its half, leaving only the user half visible
+    const scaleX = FW / raw.width;
     const scaleY = FH / raw.height;
     const scale = Math.max(scaleX, scaleY);
-    const sw = halfW / scale, sh = FH / scale;
+    const sw = FW / scale, sh = FH / scale;
     const sx = (raw.width - sw) / 2, sy = (raw.height - sh) / 2;
-    ctx.drawImage(raw, sx, sy, sw, sh, userX, 0, halfW, FH);
-    ctx.restore();
+    ctx.drawImage(raw, sx, sy, sw, sh, 0, 0, FW, FH);
 
-    // STEP 2: apply filter only to user half pixels
-    const id = ctx.getImageData(userX, 0, halfW, FH);
-    applyFXData(id.data, halfW, FH);
-    ctx.putImageData(id, userX, 0);
-    if(fx==="y2k"){
-      ctx.save(); ctx.beginPath(); ctx.rect(userX,0,halfW,FH); ctx.clip();
-      ctx.globalAlpha=.18;
-      const gr=ctx.createRadialGradient(userX+halfW*.3,FH*.2,0,userX+halfW*.5,FH*.4,halfW*.7);
-      gr.addColorStop(0,"rgba(255,240,200,1)");gr.addColorStop(.5,"rgba(255,180,220,.5)");gr.addColorStop(1,"rgba(220,200,255,0)");
-      ctx.fillStyle=gr; ctx.fillRect(userX,0,halfW,FH); ctx.restore();
-    }
+    // STEP 2: apply filter to full canvas
+    applyFX(ctx, FW, FH);
 
-    // STEP 3: overlay idol frame (RGBA PNG — transparent side shows user, opaque side = idol)
+    // STEP 3: overlay idol PNG — its transparent half shows user, opaque half = idol
     ctx.drawImage(fm2, 0, 0, FW, FH);
 
     showPhoto(c.toDataURL("image/png"), true);
